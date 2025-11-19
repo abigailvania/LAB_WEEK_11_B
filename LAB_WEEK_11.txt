@@ -1,0 +1,52 @@
+1. Gambar yang diambil oleh user akan diletakkan pada path sesuai dengan URI. Kode yang membantu penyimpanannya adalah
+
+fun insertImageToStore(fileInfo: FileInfo?) {
+    fileInfo?.let {
+        insertToStore(
+            fileInfo,
+            mediaContentHelper.getImageContentUri(),
+            mediaContentHelper.generateImageContentValues(it)
+        )
+    }
+}
+
+private fun insertToStore(fileInfo: FileInfo, contentUri: Uri, contentValues: ContentValues) {
+    executor.execute {
+        val insertedUri = contentResolver.insert(contentUri, contentValues)
+        insertedUri?.let {
+            val inputStream = contentResolver.openInputStream(fileInfo.uri)
+            val outputStream = contentResolver.openOutputStream(insertedUri)
+            IOUtils.copy(inputStream, outputStream)
+        }
+    }
+}
+
+Function insertImageToStore berfungsi sebagai wrapper untuk memeriksa fileInfo. Jika tidak null, maka akan memanggil insertToStore, di mana insertToStore akan menyimpan data yang telah masuk. File kemudian akan di-insert dan di copy ke MediaStore.
+
+2. Kelima atribut tersebut adalah:
+a. val uri: Uri,
+b. val file: File,
+c. val name: String,
+d. val relativePath: String,
+e. val mimeType: String.
+
+Uri akan menyimpan ke dalam lokasi fisik sementara dari file foto yang baru diambil. Uri kemudian akan membantu kamera agar dapat menulis file ke dalam lokasi penyimpanan agar dapat disalin ke dalam MediaStore. Uri biasanya mengarahkan ke file yang ada di folder aplikasi.
+
+Relative path adalah folder tujuan di MediaStore di mana file akan disimpan setelah berhasil disalin. Jika Uri adalah file local dan private, maka relative path akan menyimpan di public folder, di mana kemudian foto yang telah diambil akan disimpan.
+
+3. Ketika user mengambil gambar dengan menekan tombol kamera, maka MainActivity akan menjalankan code berikut:
+
+photoInfo = providerFileManager.generatePhotoUri(System.currentTimeMillis())
+takePictureLauncher.launch(photoInfo.uri)
+
+Ketika foto diambil, maka secara otomatis akan terbentuk Uri yang berfungsi sebagai penyimpanan temporary dari gambar yang diambil. Setelah gambar berhasil diambil, gambar tersebut langsung disimpan ke dalam Uri dengan code:
+
+fileInfo.file
+
+Ketika selesai, maka MainActivity akan menjalankan code:
+
+takePictureLauncher = registerForActivityResult(TakePicture()) {
+    providerFileManager.insertImageToStore(photoInfo)
+}
+
+Code di atas akan memanggil insertImageToStore, di mana function ini akan melakukan validasi terhadap fileInfo yang dikirimkan. Ketika validasi berhasil, maka akan memanggil insertToStore(). Function ini akan membuat metadata untuk MediaStore. File yang sudah divalidasi ini kemudian akan disalin ke MediaStore, sehingga gambar bisa masuk ke galeri dan folder public.
